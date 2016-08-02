@@ -24,6 +24,8 @@ include 	"std.armv6"
 include 	"../broadcom/bcm2835/std.rpi"
 include 	"../broadcom/bcm2835/std.bcm2836"
 
+env		"RPI2.env"
+
 options 	INTRNG
 
 options 	SCHED_ULE		# ULE scheduler
@@ -51,9 +53,9 @@ device		snp
 device		pl011
 
 # Comment following lines for boot console on serial port
-device		vt
-device		kbdmux
-device		ukbd
+#device		vt
+#device		kbdmux
+#device		ukbd
 
 device		sdhci
 device		mmc

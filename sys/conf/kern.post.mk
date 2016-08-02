@@ -162,7 +162,7 @@ ${mfile:T:S/.m$/.h/}: ${mfile}
 
 kernel-clean:
 	rm -f *.o *.so *.So *.ko *.s eddep errs \
-	    ${FULLKERNEL} ${KERNEL_KO} ${KERNEL_KO}.debug \
+	    ${FULLKERNEL} ${KERNEL_KO} ${KERNEL_KO}.bin ${KERNEL_KO}.debug \
 	    linterrs tags vers.c \
 	    vnode_if.c vnode_if.h vnode_if_newproto.h vnode_if_typedef.h \
 	    ${MFILES:T:S/.m$/.c/} ${MFILES:T:S/.m$/.h/} \
@@ -328,6 +328,7 @@ kernel-install: .PHONY
 .endif
 	mkdir -p ${DESTDIR}${KODIR}
 	${INSTALL} -p -m 555 -o ${KMODOWN} -g ${KMODGRP} ${KERNEL_KO} ${DESTDIR}${KODIR}/
+	${INSTALL} -p -m 555 -o ${KMODOWN} -g ${KMODGRP} ${KERNEL_KO}.bin ${DESTDIR}${KODIR}/
 .if defined(DEBUG) && !defined(INSTALL_NODEBUG) && ${MK_KERNEL_SYMBOLS} != "no"
 	mkdir -p ${DESTDIR}${KERN_DEBUGDIR}${KODIR}
 	${INSTALL} -p -m 555 -o ${KMODOWN} -g ${KMODGRP} ${KERNEL_KO}.debug ${DESTDIR}${KERN_DEBUGDIR}${KODIR}/
@@ -341,6 +342,7 @@ kernel-install: .PHONY
 kernel-reinstall:
 	@-chflags -R noschg ${DESTDIR}${KODIR}
 	${INSTALL} -p -m 555 -o ${KMODOWN} -g ${KMODGRP} ${KERNEL_KO} ${DESTDIR}${KODIR}/
+	${INSTALL} -p -m 555 -o ${KMODOWN} -g ${KMODGRP} ${KERNEL_KO}.bin ${DESTDIR}${KODIR}/
 .if defined(DEBUG) && !defined(INSTALL_NODEBUG) && ${MK_KERNEL_SYMBOLS} != "no"
 	${INSTALL} -p -m 555 -o ${KMODOWN} -g ${KMODGRP} ${KERNEL_KO}.debug ${DESTDIR}${KERN_DEBUGDIR}${KODIR}/
 .endif
