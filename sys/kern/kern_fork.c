@@ -15,7 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -1074,7 +1074,7 @@ fork_return(struct thread *td, struct trapframe *frame)
 			 * parent's children, do it now.
 			 */
 			dbg = p->p_pptr->p_pptr;
-			proc_set_traced(p);
+			proc_set_traced(p, true);
 			CTR2(KTR_PTRACE,
 		    "fork_return: attaching to new child pid %d: oppid %d",
 			    p->p_pid, p->p_oppid);
