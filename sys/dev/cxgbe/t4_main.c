@@ -607,6 +607,7 @@ struct {
 	{0x6407, "Chelsio T62100-LP-CR"},	/* 2 x 40/50/100G */
 	{0x6408, "Chelsio T62100-SO-CR"},	/* 2 x 40/50/100G, nomem */
 	{0x640d, "Chelsio T62100-CR"},		/* 2 x 40/50/100G */
+	{0x6410, "Chelsio T62100-DBG"},		/* 2 x 40/50/100G, debug */
 };
 
 #ifdef TCP_OFFLOAD
@@ -812,15 +813,6 @@ t4_attach(device_t dev)
 	if (rc != 0)
 		goto done; /* error message displayed already */
 
-	/*
-	 * This is the real PF# to which we're attaching.  Works from within PCI
-	 * passthrough environments too, where pci_get_function() could return a
-	 * different PF# depending on the passthrough configuration.  We need to
-	 * use the real PF# in all our communication with the firmware.
-	 */
-	sc->pf = G_SOURCEPF(t4_read_reg(sc, A_PL_WHOAMI));
-	sc->mbox = sc->pf;
-
 	memset(sc->chan_map, 0xff, sizeof(sc->chan_map));
 
 	/* Prepare the adapter for operation. */
@@ -831,6 +823,16 @@ t4_attach(device_t dev)
 		device_printf(dev, "failed to prepare adapter: %d.\n", rc);
 		goto done;
 	}
+
+	/*
+	 * This is the real PF# to which we're attaching.  Works from within PCI
+	 * passthrough environments too, where pci_get_function() could return a
+	 * different PF# depending on the passthrough configuration.  We need to
+	 * use the real PF# in all our communication with the firmware.
+	 */
+	j = t4_read_reg(sc, A_PL_WHOAMI);
+	sc->pf = chip_id(sc) <= CHELSIO_T5 ? G_SOURCEPF(j) : G_T6_SOURCEPF(j);
+	sc->mbox = sc->pf;
 
 	t4_init_devnames(sc);
 	if (sc->names == NULL) {
@@ -969,7 +971,7 @@ t4_attach(device_t dev)
 		pi->tc = malloc(sizeof(struct tx_sched_class) *
 		    sc->chip_params->nsched_cls, M_CXGBE, M_ZERO | M_WAITOK);
 
-		if (is_10G_port(pi) || is_40G_port(pi)) {
+		if (port_top_speed(pi) >= 10) {
 			n10g++;
 		} else {
 			n1g++;
@@ -1085,7 +1087,7 @@ t4_attach(device_t dev)
 
 			vi->first_rxq = rqidx;
 			vi->first_txq = tqidx;
-			if (is_10G_port(pi) || is_40G_port(pi)) {
+			if (port_top_speed(pi) >= 10) {
 				vi->tmr_idx = t4_tmr_idx_10g;
 				vi->pktc_idx = t4_pktc_idx_10g;
 				vi->flags |= iaq.intr_flags_10g & INTR_RXQ;
@@ -1109,7 +1111,7 @@ t4_attach(device_t dev)
 #ifdef TCP_OFFLOAD
 			vi->first_ofld_rxq = ofld_rqidx;
 			vi->first_ofld_txq = ofld_tqidx;
-			if (is_10G_port(pi) || is_40G_port(pi)) {
+			if (port_top_speed(pi) >= 10) {
 				vi->flags |= iaq.intr_flags_10g & INTR_OFLD_RXQ;
 				vi->nofldrxq = j == 0 ? iaq.nofldrxq10g :
 				    iaq.nofldrxq_vi;
@@ -1736,6 +1738,7 @@ fail:
 
 	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
+	case SIOCGIFXMEDIA:
 		ifmedia_ioctl(ifp, ifr, &vi->media, cmd);
 		break;
 
@@ -2030,6 +2033,10 @@ vcxgbe_attach(device_t dev)
 		return (-rc);
 	}
 	vi->viid = rc;
+	if (chip_id(sc) <= CHELSIO_T5)
+		vi->smt_idx = (rc & 0x7f) << 1;
+	else
+		vi->smt_idx = (rc & 0x7f);
 
 	param = V_FW_PARAMS_MNEM(FW_PARAMS_MNEM_DEV) |
 	    V_FW_PARAMS_PARAM_X(FW_PARAMS_PARAM_DEV_RSSINFO) |
@@ -5089,7 +5096,7 @@ t4_sysctls(struct adapter *sc)
 	    CTLTYPE_STRING | CTLFLAG_RD, sc, 0,
 	    sysctl_ulprx_la, "A", "ULPRX logic analyzer");
 
-	if (is_t5(sc)) {
+	if (chip_id(sc) >= CHELSIO_T5) {
 		SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "wcwr_stats",
 		    CTLTYPE_STRING | CTLFLAG_RD, sc, 0,
 		    sysctl_wcwr_stats, "A", "write combined work requests");
@@ -7232,7 +7239,12 @@ sysctl_tids(SYSCTL_HANDLER_ARGS)
 
 	if (t->ntids) {
 		if (t4_read_reg(sc, A_LE_DB_CONFIG) & F_HASHEN) {
-			uint32_t b = t4_read_reg(sc, A_LE_DB_SERVER_INDEX) / 4;
+			uint32_t b;
+
+			if (chip_id(sc) <= CHELSIO_T5)
+				b = t4_read_reg(sc, A_LE_DB_SERVER_INDEX) / 4;
+			else
+				b = t4_read_reg(sc, A_LE_DB_SRVR_START_INDEX);
 
 			if (b) {
 				sbuf_printf(sb, "TID range: 0-%u, %u-%u", b - 1,
