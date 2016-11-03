@@ -2370,7 +2370,7 @@ ctl_ioctl_fill_ooa(struct ctl_lun *lun, uint32_t *cur_fill_num,
 }
 
 static void *
-ctl_copyin_alloc(void *user_addr, int len, char *error_str,
+ctl_copyin_alloc(void *user_addr, unsigned int len, char *error_str,
 		 size_t error_str_len)
 {
 	void *kptr;
@@ -2425,6 +2425,12 @@ ctl_copyin_args(int num_args, struct ctl_be_arg *uargs,
 	for (i = 0; i < num_args; i++) {
 		uint8_t *tmpptr;
 
+		if (args[i].namelen == 0) {
+			snprintf(error_str, error_str_len, "Argument %d "
+				 "name length is zero", i);
+			goto bailout;
+		}
+
 		args[i].kname = ctl_copyin_alloc(args[i].name,
 			args[i].namelen, error_str, error_str_len);
 		if (args[i].kname == NULL)
@@ -2437,10 +2443,17 @@ ctl_copyin_args(int num_args, struct ctl_be_arg *uargs,
 		}
 
 		if (args[i].flags & CTL_BEARG_RD) {
+			if (args[i].vallen == 0) {
+				snprintf(error_str, error_str_len, "Argument %d "
+					 "value length is zero", i);
+				goto bailout;
+			}
+
 			tmpptr = ctl_copyin_alloc(args[i].value,
 				args[i].vallen, error_str, error_str_len);
 			if (tmpptr == NULL)
 				goto bailout;
+
 			if ((args[i].flags & CTL_BEARG_ASCII)
 			 && (tmpptr[args[i].vallen - 1] != '\0')) {
 				snprintf(error_str, error_str_len, "Argument "
@@ -10040,6 +10053,7 @@ ctl_inquiry_evpd_lbp(struct ctl_scsiio *ctsio, int alloc_len)
 {
 	struct scsi_vpd_logical_block_prov *lbp_ptr;
 	struct ctl_lun *lun;
+	const char *value;
 
 	lun = (struct ctl_lun *)ctsio->io_hdr.ctl_private[CTL_PRIV_LUN].ptr;
 
@@ -10077,7 +10091,14 @@ ctl_inquiry_evpd_lbp(struct ctl_scsiio *ctsio, int alloc_len)
 	if (lun != NULL && lun->be_lun->flags & CTL_LUN_FLAG_UNMAP) {
 		lbp_ptr->flags = SVPD_LBP_UNMAP | SVPD_LBP_WS16 |
 		    SVPD_LBP_WS10 | SVPD_LBP_RZ | SVPD_LBP_ANC_SUP;
-		lbp_ptr->prov_type = SVPD_LBP_THIN;
+		value = ctl_get_opt(&lun->be_lun->options, "provisioning_type");
+		if (value != NULL) {
+			if (strcmp(value, "resource") == 0)
+				lbp_ptr->prov_type = SVPD_LBP_RESOURCE;
+			else if (strcmp(value, "thin") == 0)
+				lbp_ptr->prov_type = SVPD_LBP_THIN;
+		} else
+			lbp_ptr->prov_type = SVPD_LBP_THIN;
 	}
 
 	ctl_set_success(ctsio);
