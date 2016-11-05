@@ -28,6 +28,7 @@ makeoptions	CONF_CFLAGS="-march=armv7a"
 makeoptions	KERNVIRTADDR=0xc0000000
 options 	KERNVIRTADDR=0xc0000000
 
+env		"RPI2.env"
 include 	"std.armv6"
 files		"../allwinner/files.allwinner"
 files		"../allwinner/a20/files.a20"
@@ -193,9 +194,9 @@ device		miibus
 device		sound
 
 # Framebuffer support
-device		vt
-device		kbdmux
-device		ums
+#device		vt
+#device		kbdmux
+#device		ums
 device		videomode
 device		hdmi
 device		vchiq
